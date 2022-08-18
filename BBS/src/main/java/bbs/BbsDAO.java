@@ -1,0 +1,156 @@
+package bbs;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+
+public class BbsDAO {
+	private Connection conn;
+	private ResultSet rs;
+	
+	public BbsDAO() { // DB접속 객체 생성
+		try {
+			String dbURL = "jdbc:mysql://localhost:3306/BBS"; // 로컬 DB의 BBS데이터베이스 접속
+			String dbID = "root";
+			String dbPassword = "password";
+			Class.forName("com.mysql.jdbc.Driver"); // MySQL드라이버 설정
+			conn = DriverManager.getConnection(dbURL, dbID, dbPassword); // DB 접속후 conn에 접속 정보 입력
+		}catch(Exception e) {
+			e.printStackTrace(); //오류 내용 출력
+		}
+	}
+	
+	public String getDate() { // 데이터 작성시의 시각 추출하여 글쓰기시에 시각 기록
+		String SQL ="SELECT NOW()"; // 현재 시간 
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL); // SQL문장 실행준비 단계 // pstmt 충돌 방지위해 함수안에 넣어줌
+			rs = pstmt.executeQuery(); // SQL문 실행 결과 가져옴
+			if (rs.next()) {
+				return rs.getString(1);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return ""; // 데이터 베이스 오류
+	}
+	
+	public int getNext() { // bbsID 가져오는 함수
+		String SQL ="SELECT bbsID FROM BBS ORDER BY bbsID DESC"; // bbsID 내림차순으로 취득 
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL); // SQL문장 실행준비 단계 // pstmt 충돌 방지위해 함수안에 넣어줌
+			rs = pstmt.executeQuery(); // SQL문 실행 결과 가져옴
+			if (rs.next()) {
+				return rs.getInt(1) + 1;
+			}
+			return 1; // 현재가 첫번째 게시물인 경우
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return -1; // 데이터 베이스 오류
+	}
+	
+	public int write(String bbsTitle, String userID, String bbsContent) {
+		String SQL ="INSERT INTO BBS VALUES (?, ?, ?, ?, ?, ?)"; // bbsID 내림차순으로 취득 
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL); // SQL문장 실행준비 단계 // pstmt 충돌 방지위해 함수안에 넣어줌
+			pstmt.setInt(1, getNext()); 		// 게시글 번호 getNext로 취득
+			pstmt.setString(2, bbsTitle);		// 게시글 제목
+			pstmt.setString(3, userID);			// 게시자 ID
+			pstmt.setString(4, getDate());      // 글 작성 날짜
+			pstmt.setString(5, bbsContent);		// 글 내용
+			pstmt.setInt(6, 1);					// 글 삭제 여부 플래그 1: 사용 0: 삭제
+			return pstmt.executeUpdate(); // SQL문 실행이 성공했다면 0이상의 값을 반환
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return -1; // 데이터 베이스 오류
+	}
+	
+	public ArrayList<Bbs> getList(int pageNumber) { // Bbs Bean 에서 특별한 리스트를 받아서 반환
+		String SQL = "SELECT * FROM BBS WHERE bbsID < ? AND bbsAvailable = 1 ORDER BY bbsID DESC LIMIT 10";
+		ArrayList<Bbs> list = new ArrayList<Bbs>(); // Bbs 클래스 에서 나오는 인스턴스를 보관하는 List를 생성
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL); // SQL문장 실행준비 단계 // pstmt 충돌 방지위해 함수안에 넣어줌
+			pstmt.setInt(1, getNext() - (pageNumber - 1) * 10); // 각 페이지 에서 출력될 bbsID의 첫번째 값을 구함
+			rs = pstmt.executeQuery(); // SQL실행후 rs에 결과값 저장
+			while (rs.next()) {
+				Bbs bbs = new Bbs();
+				bbs.setBbsID(rs.getInt(1));
+				bbs.setBbsTitle(rs.getString(2));
+				bbs.setUserID(rs.getString(3));
+				bbs.setBbsDate(rs.getString(4));
+				bbs.setBbsContent(rs.getString(5));
+				bbs.setBbsAvailable(rs.getInt(6));
+				list.add(bbs); // List에 bbs인스턴스를 격납
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return list;
+	}
+	
+	public boolean nextPage(int pageNumber) { // 다음 페이지가 존재하는지 확인하는 함수
+		String SQL = "SELECT * FROM BBS WHERE bbsID < ? AND bbsAvailable = 1";
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL);
+			pstmt.setInt(1, getNext() - (pageNumber - 1) * 10);
+			rs = pstmt.executeQuery();
+			if (rs.next()) { // 값이 있다면 다음페이지가 존재함
+				return true;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return false; // 값이 없다면 다음페이지가 존재 하지 않음
+	}
+	
+	public Bbs getBbs(int bbsID) { // Bbs형을 리턴하는 게시판 글을 가져오는 메서드
+		String SQL = "SELECT * FROM BBS WHERE bbsID = ?";
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL);
+			pstmt.setInt(1, bbsID);
+			rs = pstmt.executeQuery();
+			if(rs.next()) {
+				Bbs bbs = new Bbs();
+				bbs.setBbsID(rs.getInt(1));
+				bbs.setBbsTitle(rs.getString(2));
+				bbs.setUserID(rs.getString(3));
+				bbs.setBbsDate(rs.getString(4));
+				bbs.setBbsContent(rs.getString(5));
+				bbs.setBbsAvailable(rs.getInt(6));
+				return bbs;
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null; // 해당 글이 존재하지 않을 경우 null 반환
+	}
+	
+	public int update(int bbsID, String bbsTitle, String bbsContent) { // 게시글 수정 메서드
+		String SQL = "UPDATE BBS SET bbsTitle = ?, bbsContent = ? WHERE bbsID = ?";
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL);
+			pstmt.setString(1, bbsTitle);
+			pstmt.setString(2, bbsContent);
+			pstmt.setInt(3, bbsID);
+			return pstmt.executeUpdate(); // 성공시 0이상의 값 리턴
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return -1; // DB에러
+	}
+	
+	public int delete(int bbsID) {
+		String SQL = "UPDATE BBS SET bbsAvailable = 0 WHERE bbsID = ?";
+		try {
+			PreparedStatement pstmt = conn.prepareStatement(SQL);
+			pstmt.setInt(1, bbsID);
+			return pstmt.executeUpdate();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return -1;
+	}
+}

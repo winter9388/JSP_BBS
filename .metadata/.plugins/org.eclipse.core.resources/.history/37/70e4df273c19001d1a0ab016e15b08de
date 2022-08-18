@@ -1,0 +1,20 @@
+package user;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+public class UserDAO {
+
+	private Connection conn;
+	private PreparedStatement pstmt;
+	private ResultSet rs;
+	
+	public UserDAO() { // DB접속 객체 생성
+		try {
+			String dbURL = "jdbc:mysql://localhost:3306/BBS"; // 로컬 DB의 BBS데이터베이스 접속
+		}catch(Exception e) {
+			e.printStackTrace(); //오류 내용 출력
+		}
+	}
+}
